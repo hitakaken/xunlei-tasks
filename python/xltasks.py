@@ -14,7 +14,7 @@ class XLTaskDb:
     # P2spTask 表对象
     class P2spTask(sqlobject.SQLObject):
         # app_id = sqlobject.StringCol(length=14, unique=True)
-        Id = sqlobject.BigIntCol(length=0, dbName='TaskId', alternateID=False)
+        TaskId = sqlobject.BigIntCol(length=0, dbName='TaskId', alternateID=False)
         ResourceUsageStrategy = sqlobject.IntCol(length=0, dbName='ResourceUsageStrategy')
         ResourceReportStrategy = sqlobject.IntCol(length=0, dbName='ResourceReportStrategy')
         Cookie = sqlobject.StringCol(length=0)
@@ -43,7 +43,7 @@ class XLTaskDb:
     # TaskBase 表对象
     class TaskBase(sqlobject.SQLObject):
         # app_id = sqlobject.StringCol(length=14, unique=True)
-        Id = sqlobject.BigIntCol(length=0, dbName='TaskId')
+        TaskId = sqlobject.BigIntCol(length=0, dbName='TaskId')
         Type = sqlobject.IntCol(length=0, dbName='Type')
         Status = sqlobject.IntCol(length=0, dbName='Status')
         StatusChangeTime = sqlobject.BigIntCol(length=0, dbName='StatusChangeTime')
@@ -111,7 +111,7 @@ class XLTaskDb:
         self.P2spTask.createTable(ifNotExists=True)
         self.TaskBase.createTable(ifNotExists=True)
         current_id = self.TaskBase.select().max('TaskId')
-        self.task_id = current_id + 1 if current_id is not None else 1
+        self.task_id = (current_id + 10) if current_id is not None else 10
 
     # 添加任务
     def task(self,
@@ -196,7 +196,7 @@ class XLTaskDb:
         if Name is None:
             Name = Url.split('/')[-1].split('#')[0].split('?')[0]
         # 写表
-        tp = self.P2spTask(Id=taskid,
+        self.P2spTask(id=taskid, TaskId=taskid,
                            ResourceUsageStrategy=ResourceUsageStrategy, ResourceReportStrategy=ResourceReportStrategy,
                            Cookie=Cookie, AccountNeeded=AccountNeeded, UserName=UserName, Password=Password,
                            UseOriginResourceOnly=UseOriginResourceOnly,
@@ -211,7 +211,7 @@ class XLTaskDb:
                            ResourceQuerySize=ResourceQuerySize,
                            DisplayUrl=Url,
                            UserAgent=UserAgent)
-        tb = self.TaskBase(Id=taskid, Type=Type, Status=Status, StatusChangeTime=StatusChangeTime,
+        self.TaskBase(id=taskid, TaskId=taskid, Type=Type, Status=Status, StatusChangeTime=StatusChangeTime,
                            SavePath=SavePath, TotalReceiveSize=TotalReceiveSize, TotalSendSize=TotalSendSize,
                            TotalReceiveValidSize=TotalReceiveValidSize, TotalUploadSize=TotalUploadSize,
                            CreationTime=CreationTime, FileCreated=FileCreated, CompletionTime=CompletionTime,
