@@ -11,7 +11,7 @@ from sqlobject.sqlite import builder
 class XLTaskDb:
     class P2spTask(sqlobject.SQLObject):
         # app_id = sqlobject.StringCol(length=14, unique=True)
-        TaskId = sqlobject.BigIntCol(length=0, dbName='TaskId', alternateID=False)
+        Id = sqlobject.BigIntCol(length=0, dbName='TaskId', alternateID=False)
         ResourceUsageStrategy = sqlobject.IntCol(length=0, dbName='ResourceUsageStrategy')
         ResourceReportStrategy = sqlobject.IntCol(length=0, dbName='ResourceReportStrategy')
         Cookie = sqlobject.StringCol(length=0)
@@ -39,7 +39,7 @@ class XLTaskDb:
 
     class TaskBase(sqlobject.SQLObject):
         # app_id = sqlobject.StringCol(length=14, unique=True)
-        TaskId = sqlobject.BigIntCol(length=0, dbName='TaskId')
+        Id = sqlobject.BigIntCol(length=0, dbName='TaskId')
         Type = sqlobject.IntCol(length=0, dbName='Type')
         Status = sqlobject.IntCol(length=0, dbName='Status')
         StatusChangeTime = sqlobject.BigIntCol(length=0, dbName='StatusChangeTime')
@@ -100,15 +100,128 @@ class XLTaskDb:
             table = 'TaskBase'
             idName = 'TaskId'
 
-    def __init__(self, dbpath):
-        self.conn = builder()(dbpath)
+    def __init__(self, db_path='C:/Program Files (x86)/Thunder Network/Thunder/Profiles/TaskDb.dat'):
+        self.conn = builder()(db_path)
         self.P2spTask._connection = self.conn
         self.TaskBase._connection = self.conn
         self.P2spTask.createTable(ifNotExists=True)
         self.TaskBase.createTable(ifNotExists=True)
-        print self.TaskBase.max('TaskId')
+        current_id = self.TaskBase.select().max('TaskId')
+        self.task_id = current_id + 1 if current_id is not None else 1
 
-    def task(self, target, url):
-        pass
-
-
+    def task(self,
+             SavePath,
+             Url,
+             # TaskBase
+             Type=1,
+             Status=5,  # 3 排队. 5 开始. 7暂停. 8完成
+             StatusChangeTime=0,
+             TotalReceiveSize=0,
+             TotalSendSize=0,
+             TotalReceiveValidSize=0,
+             TotalUploadSize=0,
+             CreationTime=0,
+             FileCreated=0,
+             CompletionTime=0,
+             DownloadingPeriod=0,
+             RemovingToRecycleTime=0,
+             FailureErrorCode=0,
+             ReferenceUrl='',
+             ResourceSize=0,
+             Name=None,
+             Cid=None,
+             Gcid=None,
+             Description='',  # 备注名称
+             CategoryId=-1,
+             ResourceQueryCid=None,
+             CreationRequestType=0,
+             StartMode=0,
+             NamingType=1,
+             StatisticsReferenceUrl='',
+             UserRead=0,
+             FileSafetyFlag=0,
+             Playable=0,
+             BlockInfo=None,
+             OpenOnComplete=0,
+             SpecialType=-1,
+             Proxy=None,
+             OriginReceiveSize=0,
+             P2pReceiveSize=0,
+             P2sReceiveSize=0,
+             OfflineReceiveSize=0,
+             VipReceiveSize=0,
+             VipResourceEnableNecessary=0,
+             ConsumedVipSize=0,
+             Forbidden=0,
+             OptionalChannelDataSize=None,
+             OwnerProductId=0,
+             UserData=None,
+             UrlCodePage=-1,
+             ReferenceUrlCodePage=-1,
+             StatisticsReferenceUrlCodePage=-1,
+             GroupTaskId=-1,
+             DownloadSubTask=0,
+             TagValue=0,
+             InnerNatReceiveSize=0,
+             AdditionFlag=0,
+             ProductInfo='',
+             # P2spTask
+             ResourceUsageStrategy=0,
+             ResourceReportStrategy=0,
+             Cookie='',
+             AccountNeeded=0,
+             UserName='',
+             Password='',
+             UseOriginResourceOnly=0,
+             OriginResourceSupportRange=1,
+             ReceiveOriginResourceSize=0,
+             OriginResourceRetryInterval=-1,
+             OriginResourceRetryTimes=-1,
+             OriginResourceThreadCount=5,
+             DownloadSpeedLimit=0,
+             FileNameFixed=0,
+             HttpRequestHeader=None,
+             VideoHeadFirstTime=-1,
+             VideoHeadFirstStatus=0,
+             ResourceQuerySize=0,
+             UserAgent=''):
+        taskid = self.task_id
+        if Name is None:
+            Name = Url.split('/')[-1].split('#')[0].split('?')[0]
+        tp = self.P2spTask(Id=taskid,
+                           ResourceUsageStrategy=ResourceUsageStrategy, ResourceReportStrategy=ResourceReportStrategy,
+                           Cookie=Cookie, AccountNeeded=AccountNeeded, UserName=UserName, Password=Password,
+                           UseOriginResourceOnly=UseOriginResourceOnly,
+                           OriginResourceSupportRange=OriginResourceSupportRange,
+                           ReceiveOriginResourceSize=ReceiveOriginResourceSize,
+                           OriginResourceRetryInterval=OriginResourceRetryInterval,
+                           OriginResourceRetryTimes=OriginResourceRetryTimes,
+                           OriginResourceThreadCount=OriginResourceThreadCount,
+                           DownloadSpeedLimit=DownloadSpeedLimit, FileNameFixed=FileNameFixed,
+                           HttpRequestHeader=HttpRequestHeader,
+                           VideoHeadFirstTime=VideoHeadFirstTime, VideoHeadFirstStatus=VideoHeadFirstStatus,
+                           ResourceQuerySize=ResourceQuerySize,
+                           DisplayUrl=Url,
+                           UserAgent=UserAgent)
+        tb = self.TaskBase(Id=taskid, Type=Type, Status=Status, StatusChangeTime=StatusChangeTime,
+                           SavePath=SavePath, TotalReceiveSize=TotalReceiveSize, TotalSendSize=TotalSendSize,
+                           TotalReceiveValidSize=TotalReceiveValidSize, TotalUploadSize=TotalUploadSize,
+                           CreationTime=CreationTime, FileCreated=FileCreated, CompletionTime=CompletionTime,
+                           DownloadingPeriod=DownloadingPeriod, RemovingToRecycleTime=RemovingToRecycleTime,
+                           FailureErrorCode=FailureErrorCode, Url=Url, ReferenceUrl=ReferenceUrl,
+                           ResourceSize=ResourceSize, Name=Name, Cid=Cid, Gcid=Gcid, Description=Description,
+                           CategoryId=CategoryId, ResourceQueryCid=ResourceQueryCid,
+                           CreationRequestType=CreationRequestType, StartMode=StartMode, NamingType=NamingType,
+                           StatisticsReferenceUrl=StatisticsReferenceUrl, UserRead=UserRead,
+                           FileSafetyFlag=FileSafetyFlag, Playable=Playable, BlockInfo=BlockInfo,
+                           OpenOnComplete=OpenOnComplete, SpecialType=SpecialType, Proxy=Proxy,
+                           OriginReceiveSize=OriginReceiveSize, P2pReceiveSize=P2pReceiveSize,
+                           P2sReceiveSize=P2sReceiveSize, OfflineReceiveSize=OfflineReceiveSize,
+                           VipReceiveSize=VipReceiveSize, VipResourceEnableNecessary=VipResourceEnableNecessary,
+                           ConsumedVipSize=ConsumedVipSize, Forbidden=Forbidden,
+                           OptionalChannelDataSize=OptionalChannelDataSize, OwnerProductId=OwnerProductId,
+                           UserData=UserData, UrlCodePage=UrlCodePage, ReferenceUrlCodePage=ReferenceUrlCodePage,
+                           StatisticsReferenceUrlCodePage=StatisticsReferenceUrlCodePage, GroupTaskId=GroupTaskId,
+                           DownloadSubTask=DownloadSubTask, TagValue=TagValue, InnerNatReceiveSize=InnerNatReceiveSize,
+                           AdditionFlag=AdditionFlag, ProductInfo=ProductInfo)
+        self.task_id += 1
