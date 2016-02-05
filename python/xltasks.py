@@ -2,9 +2,13 @@
 # -*- coding: utf-8 -*-
 import os
 import sqlobject
+import urllib2
+
+import time
+from bs4 import BeautifulSoup
 from sqlobject.sqlite import builder
 from ftplib import FTP
-
+from urlparse import urljoin
 
 # C:\Program Files (x86)\Thunder Network\Thunder\Profiles\TaskDb.dat
 # TaskDb.dat 文件为迅雷任务存储文件
@@ -275,7 +279,7 @@ class XLTaskDb:
                             parent = os.path.abspath(
                                     local.decode('utf-8') if prefix == '/' else
                                     os.path.join(local.decode('utf-8'), prefix.lstrip('/').decode('utf-8')))
-                            # 目标目录不存在，则创建目录
+                            # 首先检测目标目录是否存在存在
                             if not os.path.exists(parent):
                                 os.makedirs(parent)
                             exists = False
@@ -283,7 +287,7 @@ class XLTaskDb:
                                 if filename.decode('utf-8').lower() == name.lower():
                                     exists = True
                                     break
-                            # 且文件不存在本地目录
+                            # 且本地文件不存在
                             if not exists:
                                 url = 'ftp://' + \
                                       ('' if UserName is None
@@ -309,5 +313,39 @@ class XLTaskDb:
         ftp.quit()
 
     # 批量下载网页上链接
-    def mirror_http(self, local, lists, base, download_filter=None, overwrite=False):
-        pass
+    def mirror_http(self, local, lists, base, download_filter=None, overwrite=False, sleep=0):
+        base = base.decode('utf-8')
+        local = local.decode('utf-8')
+        for url in lists:
+            print "Process: " + url
+            req = urllib2.Request(url)
+            resp = urllib2.urlopen(req)
+            soup = BeautifulSoup(resp, "html.parser")
+            for a in soup.findAll('a'):
+                absp = urljoin(url, a['href'])
+                if absp.startswith(base):
+                    # 如果下载链接符合过滤规则
+                    if download_filter is None or download_filter(absp):
+                        relative = os.path.relpath(absp, start=base)
+                        filepath = os.path.abspath(os.path.join(local, relative))
+                        parent = os.path.dirname(filepath)
+                        name = os.path.basename(filepath)
+                        # 目标目录不存在，则创建目录
+                        if not os.path.exists(parent):
+                            os.makedirs(parent)
+                        exists = False
+                        for filename in os.listdir(parent):
+                            if filename.decode('utf-8').lower() == name.lower():
+                                exists = True
+                                break
+                        # 且本地文件不存在
+                        if not exists:
+                            absp = absp.encode('utf-8')
+                            print 'Url: ' + absp
+                            parent = parent.encode('utf-8')
+                            print 'Save: ' + parent
+                            name = name.encode('utf-8')
+                            print 'Name: ' + name
+                            self.task(parent, absp, Name=name)
+            if sleep > 0:
+                time.sleep(sleep)
