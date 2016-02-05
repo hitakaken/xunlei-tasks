@@ -1,7 +1,9 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
+import os
 import sqlobject
 from sqlobject.sqlite import builder
+from ftplib import FTP
 
 
 # C:\Program Files (x86)\Thunder Network\Thunder\Profiles\TaskDb.dat
@@ -9,6 +11,7 @@ from sqlobject.sqlite import builder
 # 每个迅雷Profiles目录存都存在TaskDb.dat文件
 # 迅雷自定义添加下载任务。运行前请关闭迅雷，并检查以上文件是否存在
 class XLTaskDb:
+    # P2spTask 表对象
     class P2spTask(sqlobject.SQLObject):
         # app_id = sqlobject.StringCol(length=14, unique=True)
         Id = sqlobject.BigIntCol(length=0, dbName='TaskId', alternateID=False)
@@ -37,6 +40,7 @@ class XLTaskDb:
             table = 'P2spTask'
             idName = 'TaskId'
 
+    # TaskBase 表对象
     class TaskBase(sqlobject.SQLObject):
         # app_id = sqlobject.StringCol(length=14, unique=True)
         Id = sqlobject.BigIntCol(length=0, dbName='TaskId')
@@ -109,9 +113,10 @@ class XLTaskDb:
         current_id = self.TaskBase.select().max('TaskId')
         self.task_id = current_id + 1 if current_id is not None else 1
 
+    # 添加任务
     def task(self,
-             SavePath,
-             Url,
+             SavePath,  # 保存目录
+             Url,       # 目标网址
              # TaskBase
              Type=1,
              Status=5,  # 3 排队. 5 开始. 7暂停. 8完成
@@ -185,9 +190,12 @@ class XLTaskDb:
              VideoHeadFirstStatus=0,
              ResourceQuerySize=0,
              UserAgent=''):
+        # id生成
         taskid = self.task_id
+        # 如果文件名没有定义则尝试自动获取文件名
         if Name is None:
             Name = Url.split('/')[-1].split('#')[0].split('?')[0]
+        # 写表
         tp = self.P2spTask(Id=taskid,
                            ResourceUsageStrategy=ResourceUsageStrategy, ResourceReportStrategy=ResourceReportStrategy,
                            Cookie=Cookie, AccountNeeded=AccountNeeded, UserName=UserName, Password=Password,
@@ -224,4 +232,82 @@ class XLTaskDb:
                            StatisticsReferenceUrlCodePage=StatisticsReferenceUrlCodePage, GroupTaskId=GroupTaskId,
                            DownloadSubTask=DownloadSubTask, TagValue=TagValue, InnerNatReceiveSize=InnerNatReceiveSize,
                            AdditionFlag=AdditionFlag, ProductInfo=ProductInfo)
+        # id自增
         self.task_id += 1
+
+    # 同步Ftp目录
+    def mirror_ftp(self, local, host, port=None, UserName=None, Password=None, base='/', encoding='utf-8',
+                   dir_filter=None, file_filter=None):
+        # 建立ftp连接
+        ftp = FTP()
+        ftp.set_debuglevel(0)
+        port = port if port is not None else 21
+        ftp.connect(host, port)
+        if UserName is not None:
+            ftp.login(UserName, Password)
+        done = set()            # 已经扫描的目录
+        todos = {base}          # 等待扫描的目录
+        current = base
+        while len(todos) > 0:
+            folders = []
+            lines = []
+            for todo in todos:
+                current = todo
+                prefix = current if current.endswith('/') else (current + '/')
+                # 进入目录
+                ftp.cwd(todo.decode('utf-8').encode(encoding))
+                # 显示目录下文件信息
+                # e.g. 不采用ftp.nlst()的原因，解析某些网站（SIPO Ftp）出错
+                ftp.dir(lines.append)
+                for line in lines:
+                    parts = line.decode(encoding).encode('utf-8').split(' ')
+                    if parts[-1] == '.' or parts[-1] == '..':
+                        continue
+                    name = parts[-1]
+                    path = prefix + name
+                    if parts[0].startswith('d'):
+                        # 如果目录符合过滤规则，继续遍历
+                        if dir_filter is None or dir_filter(name, path):
+                            folders.append(path)
+                    else:
+                        # 如果文件符合过滤规则
+                        if file_filter is None or file_filter(name, path):
+                            parent = os.path.abspath(
+                                    local.decode('utf-8') if prefix == '/' else
+                                    os.path.join(local.decode('utf-8'), prefix.lstrip('/').decode('utf-8')))
+                            # 目标目录不存在，则创建目录
+                            if not os.path.exists(parent):
+                                os.makedirs(parent)
+                            exists = False
+                            for filename in os.listdir(parent):
+                                if filename.decode('utf-8').lower() == name.lower():
+                                    exists = True
+                                    break
+                            # 且文件不存在本地目录
+                            if not exists:
+                                url = 'ftp://' + \
+                                      ('' if UserName is None
+                                       else (UserName + ('' if Password is None
+                                                         else (':'+ Password)) + '@')) \
+                                      + host + ('' if port is None else (':' + str(port))) + path
+                                username = UserName if UserName is not None else ''
+                                password = Password if Password is not None else ''
+                                accountNeeded = 0 if UserName is None else 1
+                                print 'Url: ' + url
+                                print 'Save: ' + parent
+                                parent = parent.encode('utf-8')
+                                print 'Name: ' + name
+                                self.task(parent, url, Name=name,
+                                          AccountNeeded=accountNeeded, UserName=username, Password=password,
+                                          OriginResourceThreadCount=1)
+
+                break
+            todos.update(folders)
+            done.add(current)
+            todos.remove(current)
+        # 关闭ftp连接
+        ftp.quit()
+
+    # 批量下载网页上链接
+    def mirror_http(self, local, lists, base, download_filter=None, overwrite=False):
+        pass
