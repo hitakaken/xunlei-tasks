@@ -249,6 +249,8 @@ class XLTaskDb:
         ftp.connect(host, port)
         if UserName is not None:
             ftp.login(UserName, Password)
+        else:
+            ftp.login()
         done = set()            # 已经扫描的目录
         todos = {base}          # 等待扫描的目录
         current = base
@@ -313,7 +315,7 @@ class XLTaskDb:
         ftp.quit()
 
     # 批量下载网页上链接
-    def mirror_http(self, local, lists, base, download_filter=None, overwrite=False, sleep=0):
+    def mirror_web_page_links(self, local, lists, base, download_filter=None, overwrite=False, sleep=0):
         base = base.decode('utf-8')
         local = local.decode('utf-8')
         for url in lists:
@@ -349,3 +351,52 @@ class XLTaskDb:
                             self.task(parent, absp, Name=name)
             if sleep > 0:
                 time.sleep(sleep)
+
+    # 遍历网站目录，并下载相关链接
+    def mirror_web_site(self, local, start, download_filter=None, overwrite=False):
+        local = local.decode('utf-8')
+        done = set()
+        todos = {start}
+        current = start
+        while len(todos) > 0:
+            others = []
+            for todo in todos:
+                current = todo
+                print "Process: " + current
+                req = urllib2.Request(current)
+                resp = urllib2.urlopen(req)
+                soup = BeautifulSoup(resp, "html.parser")
+                for a in soup.findAll('a'):
+                    absp = urljoin(current, a['href'])
+                    if absp.startswith(current) and absp != current:
+                        # 如果下载链接符合过滤规则
+                        if download_filter is None or download_filter(absp):
+                            if absp.endswith('/') and absp not in done:
+                                others.append(absp)
+                            else:
+                                relative = os.path.relpath(absp, start=start)
+                                filepath = os.path.abspath(os.path.join(local, relative))
+                                parent = os.path.dirname(filepath)
+                                name = os.path.basename(filepath)
+                                # 目标目录不存在，则创建目录
+                                exists = False
+                                if not os.path.exists(parent):
+                                    os.makedirs(parent)
+                                    exists = False
+                                for filename in os.listdir(parent):
+                                    if filename.decode('utf-8').lower() == name.lower():
+                                        exists = True
+                                        break
+                                # 且本地文件不存在
+                                if not exists:
+                                    absp = absp.encode('utf-8')
+                                    print 'Url: ' + absp
+                                    parent = parent.encode('utf-8')
+                                    print 'Save: ' + parent
+                                    name = name.encode('utf-8')
+                                    print 'Name: ' + name
+                                    self.task(parent, absp, Name=name)
+                break
+            todos.update(others)
+            done.add(current)
+            todos.remove(current)
