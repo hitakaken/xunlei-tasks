@@ -14,6 +14,8 @@ from urlparse import urljoin
 # TaskDb.dat 文件为迅雷任务存储文件
 # 每个迅雷Profiles目录存都存在TaskDb.dat文件
 # 迅雷自定义添加下载任务。运行前请关闭迅雷，并检查以上文件是否存在
+
+
 class XLTaskDb:
     # P2spTask 表对象
     class P2spTask(sqlobject.SQLObject):
@@ -314,8 +316,17 @@ class XLTaskDb:
         # 关闭ftp连接
         ftp.quit()
 
+    # 使用代理
+    @staticmethod
+    def use_proxy(proxy):
+        if proxy is not None:
+            proxy_handler = urllib2.ProxyHandler(proxy)
+            opener = urllib2.build_opener(proxy_handler)
+            urllib2.install_opener(opener)
+
     # 批量下载网页上链接
-    def mirror_web_page_links(self, local, lists, base, download_filter=None, overwrite=False, sleep=0):
+    def mirror_web_page_links(self, local, lists, base, download_filter=None, overwrite=False, sleep=0, proxy=None):
+        self.use_proxy(proxy)
         base = base.decode('utf-8')
         local = local.decode('utf-8')
         for url in lists:
@@ -353,7 +364,8 @@ class XLTaskDb:
                 time.sleep(sleep)
 
     # 遍历网站目录，并下载相关链接
-    def mirror_web_site(self, local, start, download_filter=None, overwrite=False):
+    def mirror_web_site(self, local, start, download_filter=None, overwrite=False, proxy=None):
+        self.use_proxy(proxy)
         local = local.decode('utf-8')
         done = set()
         todos = {start}
